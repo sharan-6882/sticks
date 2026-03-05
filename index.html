@@ -2,14 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Ragdoll Archery Touch</title>
+<title>Ultimate Ragdoll Archers</title>
 
 <style>
 
 body{
 margin:0;
 overflow:hidden;
-background:#87CEEB;
+background:linear-gradient(#7ec0ee,#3fa34d);
 font-family:sans-serif;
 }
 
@@ -23,7 +23,18 @@ position:absolute;
 top:10px;
 left:10px;
 color:white;
-font-size:20px;
+}
+
+.bar{
+width:160px;
+height:12px;
+background:#333;
+margin-bottom:5px;
+}
+
+.hp{
+height:100%;
+background:red;
 }
 
 </style>
@@ -32,46 +43,60 @@ font-size:20px;
 <body>
 
 <div id="ui">
-Player ❤️ <span id="phealth">100</span><br>
-Enemy ❤️ <span id="ehealth">100</span>
+
+LEVEL: <span id="level">1</span><br><br>
+
+PLAYER
+<div class="bar"><div id="php" class="hp"></div></div>
+
+ENEMIES LEFT: <span id="enemycount">1</span>
+
 </div>
 
 <canvas id="game"></canvas>
 
 <script>
 
-const canvas = document.getElementById("game")
-const ctx = canvas.getContext("2d")
+const canvas=document.getElementById("game")
+const ctx=canvas.getContext("2d")
 
 function resize(){
-canvas.width = window.innerWidth
-canvas.height = window.innerHeight
+canvas.width=window.innerWidth
+canvas.height=window.innerHeight
 }
 resize()
 window.addEventListener("resize",resize)
 
-let gravity = 0.35
+let gravity=0.4
+let arrows=[]
+let level=1
 
 class Arrow{
 
-constructor(x,y,vx,vy){
+constructor(x,y,vx,vy,owner){
 this.x=x
 this.y=y
 this.vx=vx
 this.vy=vy
+this.owner=owner
+this.stuck=false
 }
 
 update(){
+
+if(this.stuck) return
+
 this.vy+=gravity
 this.x+=this.vx
 this.y+=this.vy
+
 }
 
 draw(){
 
 ctx.beginPath()
 ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x-this.vx*3,this.y-this.vy*3)
+ctx.lineTo(this.x-this.vx*4,this.y-this.vy*4)
 ctx.strokeStyle="brown"
 ctx.lineWidth=4
 ctx.stroke()
@@ -80,29 +105,88 @@ ctx.stroke()
 
 }
 
-let arrows=[]
+class Fighter{
 
-let player={
-x:150,
-y:0,
-health:100
-}
+constructor(x,color){
 
-let enemy={
-x:0,
-y:0,
-health:100
-}
-
-function updatePositions(){
-
-player.y = canvas.height-200
-enemy.x = canvas.width-150
-enemy.y = canvas.height-200
+this.x=x
+this.y=0
+this.color=color
+this.health=100
+this.alive=true
 
 }
 
-updatePositions()
+update(){
+this.y=canvas.height-220
+}
+
+draw(){
+
+if(!this.alive) return
+
+let x=this.x
+let y=this.y
+
+ctx.strokeStyle=this.color
+ctx.lineWidth=6
+
+// head
+ctx.beginPath()
+ctx.arc(x,y-20,12,0,Math.PI*2)
+ctx.stroke()
+
+// body
+ctx.beginPath()
+ctx.moveTo(x,y)
+ctx.lineTo(x,y+60)
+ctx.stroke()
+
+// arms
+ctx.beginPath()
+ctx.moveTo(x,y+10)
+ctx.lineTo(x-30,y+30)
+ctx.moveTo(x,y+10)
+ctx.lineTo(x+30,y+30)
+ctx.stroke()
+
+// legs
+ctx.beginPath()
+ctx.moveTo(x,y+60)
+ctx.lineTo(x-25,y+100)
+ctx.moveTo(x,y+60)
+ctx.lineTo(x+25,y+100)
+ctx.stroke()
+
+}
+
+}
+
+let player=new Fighter(150,"blue")
+let enemies=[]
+
+function spawnEnemies(){
+
+enemies=[]
+
+let count=level+1
+
+for(let i=0;i<count;i++){
+
+let spacing=canvas.width/(count+1)
+let x=spacing*(i+1)
+
+if(x<250) x+=250
+
+enemies.push(new Fighter(x,"red"))
+
+}
+
+document.getElementById("enemycount").innerText=enemies.length
+
+}
+
+spawnEnemies()
 
 let aiming=false
 let aimX=0
@@ -110,12 +194,12 @@ let aimY=0
 
 function shoot(px,py){
 
-let dx = px-player.x
-let dy = py-player.y
+let dx=px-player.x
+let dy=py-player.y
 
-let power=0.15
+let power=0.16
 
-arrows.push(new Arrow(player.x,player.y,dx*power,dy*power))
+arrows.push(new Arrow(player.x,player.y,dx*power,dy*power,"player"))
 
 }
 
@@ -132,7 +216,7 @@ aimY=e.clientY
 }
 })
 
-canvas.addEventListener("mouseup",e=>{
+canvas.addEventListener("mouseup",()=>{
 shoot(aimX,aimY)
 aiming=false
 })
@@ -155,57 +239,104 @@ shoot(aimX,aimY)
 aiming=false
 })
 
-function drawStickman(x,y,color){
+function enemyShoot(enemy){
 
-ctx.strokeStyle=color
-ctx.lineWidth=6
+if(!enemy.alive) return
 
-ctx.beginPath()
-ctx.arc(x,y-15,12,0,Math.PI*2)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(x,y)
-ctx.lineTo(x,y+50)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(x,y+10)
-ctx.lineTo(x-20,y+30)
-ctx.moveTo(x,y+10)
-ctx.lineTo(x+20,y+30)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(x,y+50)
-ctx.lineTo(x-20,y+80)
-ctx.moveTo(x,y+50)
-ctx.lineTo(x+20,y+80)
-ctx.stroke()
-
-}
-
-function enemyShoot(){
-
-let dx = player.x-enemy.x
-let dy = player.y-enemy.y
+let dx=(player.x-enemy.x)+(Math.random()*120-60)
+let dy=(player.y-enemy.y)+(Math.random()*120-60)
 
 let power=0.12
 
-arrows.push(new Arrow(enemy.x,enemy.y,dx*power,dy*power))
+arrows.push(new Arrow(enemy.x,enemy.y,dx*power,dy*power,"enemy"))
 
 }
 
-setInterval(enemyShoot,2200)
+setInterval(()=>{
+
+for(let e of enemies){
+enemyShoot(e)
+}
+
+},3000)
+
+function hitCheck(a){
+
+// enemies hit
+if(a.owner==="player"){
+
+for(let e of enemies){
+
+if(!e.alive) continue
+
+if(Math.abs(a.x-e.x)<12 && Math.abs(a.y-(e.y-20))<12){
+
+e.health-=30
+a.stuck=true
+
+}
+
+else if(Math.abs(a.x-e.x)<25 && Math.abs(a.y-e.y)<60){
+
+e.health-=12
+a.stuck=true
+
+}
+
+if(e.health<=0){
+e.alive=false
+}
+
+}
+
+}
+
+// player hit
+if(a.owner==="enemy"){
+
+if(Math.abs(a.x-player.x)<12 && Math.abs(a.y-(player.y-20))<12){
+
+player.health-=20
+a.stuck=true
+
+}
+
+else if(Math.abs(a.x-player.x)<25 && Math.abs(a.y-player.y)<60){
+
+player.health-=8
+a.stuck=true
+
+}
+
+}
+
+}
+
+function nextLevel(){
+
+level++
+player.health=100
+arrows=[]
+
+spawnEnemies()
+
+document.getElementById("level").innerText=level
+
+}
 
 function update(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height)
 
-updatePositions()
+player.update()
+player.draw()
 
-drawStickman(player.x,player.y,"blue")
-drawStickman(enemy.x,enemy.y,"red")
+for(let e of enemies){
+
+e.update()
+e.draw()
+
+}
 
 if(aiming){
 
@@ -222,30 +353,24 @@ for(let a of arrows){
 
 a.update()
 a.draw()
-
-if(Math.abs(a.x-enemy.x)<20 && Math.abs(a.y-enemy.y)<40){
-enemy.health-=10
-a.y=9999
-}
-
-if(Math.abs(a.x-player.x)<20 && Math.abs(a.y-player.y)<40){
-player.health-=10
-a.y=9999
-}
+hitCheck(a)
 
 }
 
-document.getElementById("phealth").innerText=player.health
-document.getElementById("ehealth").innerText=enemy.health
+let alive=enemies.filter(e=>e.alive).length
+
+document.getElementById("enemycount").innerText=alive
+document.getElementById("php").style.width=player.health+"%"
+
+if(alive===0){
+setTimeout(nextLevel,800)
+}
 
 if(player.health<=0){
-alert("Enemy Wins!")
-location.reload()
-}
 
-if(enemy.health<=0){
-alert("You Win!")
+alert("Game Over! Level reached: "+level)
 location.reload()
+
 }
 
 requestAnimationFrame(update)
