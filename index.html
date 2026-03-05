@@ -2,18 +2,20 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Ragdoll Archery</title>
+<title>Ragdoll Archery Touch</title>
 
 <style>
+
 body{
 margin:0;
-background:#87CEEB;
 overflow:hidden;
+background:#87CEEB;
 font-family:sans-serif;
 }
 
 canvas{
 display:block;
+touch-action:none;
 }
 
 #ui{
@@ -23,6 +25,7 @@ left:10px;
 color:white;
 font-size:20px;
 }
+
 </style>
 </head>
 
@@ -40,12 +43,17 @@ Enemy ❤️ <span id="ehealth">100</span>
 const canvas = document.getElementById("game")
 const ctx = canvas.getContext("2d")
 
+function resize(){
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
+}
+resize()
+window.addEventListener("resize",resize)
 
-let gravity = 0.3
+let gravity = 0.35
 
 class Arrow{
+
 constructor(x,y,vx,vy){
 this.x=x
 this.y=y
@@ -60,56 +68,91 @@ this.y+=this.vy
 }
 
 draw(){
+
 ctx.beginPath()
 ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x-this.vx*2,this.y-this.vy*2)
+ctx.lineTo(this.x-this.vx*3,this.y-this.vy*3)
 ctx.strokeStyle="brown"
 ctx.lineWidth=4
 ctx.stroke()
+
 }
+
 }
 
 let arrows=[]
 
 let player={
 x:150,
-y:canvas.height-200,
+y:0,
 health:100
 }
 
 let enemy={
-x:canvas.width-150,
-y:canvas.height-200,
+x:0,
+y:0,
 health:100
 }
 
-let mouse={
-x:0,
-y:0,
-down:false
+function updatePositions(){
+
+player.y = canvas.height-200
+enemy.x = canvas.width-150
+enemy.y = canvas.height-200
+
 }
 
-canvas.addEventListener("mousedown",e=>{
-mouse.down=true
-mouse.x=e.clientX
-mouse.y=e.clientY
-})
+updatePositions()
 
-canvas.addEventListener("mouseup",e=>{
+let aiming=false
+let aimX=0
+let aimY=0
 
-let dx = mouse.x-player.x
-let dy = mouse.y-player.y
+function shoot(px,py){
+
+let dx = px-player.x
+let dy = py-player.y
 
 let power=0.15
 
 arrows.push(new Arrow(player.x,player.y,dx*power,dy*power))
 
-mouse.down=false
+}
+
+canvas.addEventListener("mousedown",e=>{
+aiming=true
+aimX=e.clientX
+aimY=e.clientY
 })
 
 canvas.addEventListener("mousemove",e=>{
-mouse.x=e.clientX
-mouse.y=e.clientY
+if(aiming){
+aimX=e.clientX
+aimY=e.clientY
+}
+})
+
+canvas.addEventListener("mouseup",e=>{
+shoot(aimX,aimY)
+aiming=false
+})
+
+canvas.addEventListener("touchstart",e=>{
+aiming=true
+let t=e.touches[0]
+aimX=t.clientX
+aimY=t.clientY
+})
+
+canvas.addEventListener("touchmove",e=>{
+let t=e.touches[0]
+aimX=t.clientX
+aimY=t.clientY
+})
+
+canvas.addEventListener("touchend",()=>{
+shoot(aimX,aimY)
+aiming=false
 })
 
 function drawStickman(x,y,color){
@@ -117,18 +160,15 @@ function drawStickman(x,y,color){
 ctx.strokeStyle=color
 ctx.lineWidth=6
 
-// body
+ctx.beginPath()
+ctx.arc(x,y-15,12,0,Math.PI*2)
+ctx.stroke()
+
 ctx.beginPath()
 ctx.moveTo(x,y)
 ctx.lineTo(x,y+50)
 ctx.stroke()
 
-// head
-ctx.beginPath()
-ctx.arc(x,y-15,12,0,Math.PI*2)
-ctx.stroke()
-
-// arms
 ctx.beginPath()
 ctx.moveTo(x,y+10)
 ctx.lineTo(x-20,y+30)
@@ -136,13 +176,13 @@ ctx.moveTo(x,y+10)
 ctx.lineTo(x+20,y+30)
 ctx.stroke()
 
-// legs
 ctx.beginPath()
 ctx.moveTo(x,y+50)
 ctx.lineTo(x-20,y+80)
 ctx.moveTo(x,y+50)
 ctx.lineTo(x+20,y+80)
 ctx.stroke()
+
 }
 
 function enemyShoot(){
@@ -156,27 +196,38 @@ arrows.push(new Arrow(enemy.x,enemy.y,dx*power,dy*power))
 
 }
 
-setInterval(enemyShoot,2000)
+setInterval(enemyShoot,2200)
 
 function update(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height)
 
+updatePositions()
+
 drawStickman(player.x,player.y,"blue")
 drawStickman(enemy.x,enemy.y,"red")
+
+if(aiming){
+
+ctx.beginPath()
+ctx.moveTo(player.x,player.y)
+ctx.lineTo(aimX,aimY)
+ctx.strokeStyle="white"
+ctx.lineWidth=2
+ctx.stroke()
+
+}
 
 for(let a of arrows){
 
 a.update()
 a.draw()
 
-// hit enemy
 if(Math.abs(a.x-enemy.x)<20 && Math.abs(a.y-enemy.y)<40){
 enemy.health-=10
 a.y=9999
 }
 
-// hit player
 if(Math.abs(a.x-player.x)<20 && Math.abs(a.y-player.y)<40){
 player.health-=10
 a.y=9999
@@ -188,12 +239,12 @@ document.getElementById("phealth").innerText=player.health
 document.getElementById("ehealth").innerText=enemy.health
 
 if(player.health<=0){
-alert("Enemy Wins")
+alert("Enemy Wins!")
 location.reload()
 }
 
 if(enemy.health<=0){
-alert("You Win")
+alert("You Win!")
 location.reload()
 }
 
