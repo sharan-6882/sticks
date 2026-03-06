@@ -8,7 +8,7 @@
 body{
 margin:0;
 overflow:hidden;
-background:#111;
+background:#0b0b0b;
 color:white;
 font-family:Arial;
 }
@@ -21,99 +21,57 @@ font-size:18px;
 }
 
 canvas{
-background:linear-gradient(#222,#000);
 display:block;
 }
 </style>
-
 </head>
 
 <body>
 
 <div id="ui">
 ❤️ Lives: <span id="lives">5</span><br>
-🎯 Level: <span id="level">1</span>
+🎯 Level: <span id="level">1</span><br>
+🏆 Score: <span id="score">0</span>
 </div>
 
 <canvas id="game"></canvas>
 
 <script>
 
-const canvas = document.getElementById("game")
-const ctx = canvas.getContext("2d")
+const canvas=document.getElementById("game")
+const ctx=canvas.getContext("2d")
 
-canvas.width = window.innerWidth
-canvas.height = window.innerHeight
+canvas.width=window.innerWidth
+canvas.height=window.innerHeight
 
-let gravity = 0.4
-let arrows = []
-let enemies = []
+let gravity=0.22
+let arrows=[]
+let enemies=[]
 let particles=[]
 
-let level = 1
-let playerLives = 5
+let level=1
+let score=0
+let lives=5
 
-let mouseDown = false
-let power = 0
 let aimX=0
 let aimY=0
+let power=0
+let charging=false
 
-class Player{
-constructor(x,y){
+class Fighter{
+
+constructor(x,y,enemy=false){
 this.x=x
 this.y=y
+this.enemy=enemy
 this.hp=100
+this.cool=120
 }
 
 draw(){
 
-ctx.fillStyle="white"
-
-ctx.beginPath()
-ctx.arc(this.x,this.y-40,10,0,Math.PI*2)
-ctx.fill()
-
+ctx.strokeStyle=this.enemy?"red":"white"
 ctx.lineWidth=4
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-30)
-ctx.lineTo(this.x,this.y)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-20)
-ctx.lineTo(this.x-20,this.y-5)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-20)
-ctx.lineTo(this.x+20,this.y-5)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x-15,this.y+30)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x+15,this.y+30)
-ctx.stroke()
-
-}
-}
-
-class Enemy{
-constructor(x,y){
-this.x=x
-this.y=y
-this.hp=60
-this.cooldown=80+Math.random()*80
-}
-
-draw(){
-
-ctx.strokeStyle="red"
 
 ctx.beginPath()
 ctx.arc(this.x,this.y-40,10,0,Math.PI*2)
@@ -148,59 +106,38 @@ ctx.stroke()
 
 update(){
 
-this.cooldown--
+if(!this.enemy) return
 
-if(this.cooldown<=0){
+this.cool--
 
-this.shoot()
+if(this.cool<=0){
 
-this.cooldown=100+Math.random()*100
+shootEnemy(this)
+
+this.cool=120+Math.random()*80
 
 }
-
-}
-
-shoot(){
-
-let dx = player.x - this.x
-let dy = player.y - this.y
-
-let dist = Math.sqrt(dx*dx+dy*dy)
-
-let speed=8
-
-let vx = dx/dist*speed
-let vy = dy/dist*speed -2
-
-arrows.push(new Arrow(this.x,this.y-20,vx,vy,true))
 
 }
 
 }
 
 class Arrow{
-constructor(x,y,vx,vy,enemy){
+
+constructor(x,y,vx,vy,enemy=false){
 this.x=x
 this.y=y
 this.vx=vx
 this.vy=vy
 this.enemy=enemy
-this.explosive=Math.random()<0.2
+this.explode=Math.random()<0.15
 }
 
 update(){
 
 this.vy+=gravity
-
 this.x+=this.vx
 this.y+=this.vy
-
-if(this.y>canvas.height){
-
-if(this.explosive) explode(this.x,this.y)
-
-return true
-}
 
 if(this.enemy){
 
@@ -208,16 +145,9 @@ let d=Math.hypot(player.x-this.x,player.y-this.y)
 
 if(d<25){
 
-playerLives--
+damagePlayer()
 
-document.getElementById("lives").innerText=playerLives
-
-if(this.explosive) explode(this.x,this.y)
-
-if(playerLives<=0){
-alert("Game Over")
-location.reload()
-}
+if(this.explode) explode(this.x,this.y)
 
 return true
 }
@@ -226,26 +156,37 @@ return true
 
 for(let e of enemies){
 
-let d=Math.hypot(e.x-this.x,e.y-this.y)
+let head=Math.hypot(e.x-this.x,e.y-40-this.y)
 
-if(d<25){
+if(head<10){
 
-e.hp-=40
-
-if(this.explosive) explode(this.x,this.y)
-
-if(e.hp<=0){
-
-enemies.splice(enemies.indexOf(e),1)
-
-}
+e.hp-=80
+blood(this.x,this.y)
+killEnemy(e)
 
 return true
+}
 
+let body=Math.hypot(e.x-this.x,e.y-this.y)
+
+if(body<20){
+
+e.hp-=40
+blood(this.x,this.y)
+killEnemy(e)
+
+return true
 }
 
 }
 
+}
+
+if(this.y>canvas.height){
+
+if(this.explode) explode(this.x,this.y)
+
+return true
 }
 
 return false
@@ -254,14 +195,73 @@ return false
 
 draw(){
 
-ctx.strokeStyle=this.explosive?"orange":"yellow"
+ctx.strokeStyle=this.explode?"orange":"yellow"
 
 ctx.beginPath()
-
 ctx.moveTo(this.x,this.y)
 ctx.lineTo(this.x-this.vx*2,this.y-this.vy*2)
-
 ctx.stroke()
+
+}
+
+}
+
+function shootEnemy(e){
+
+let dx=player.x-e.x
+let dy=player.y-e.y
+
+let dist=Math.sqrt(dx*dx+dy*dy)
+
+let speed=11
+
+let vx=dx/dist*speed
+let vy=dy/dist*speed - dist*0.01
+
+arrows.push(new Arrow(e.x,e.y-20,vx,vy,true))
+
+}
+
+function damagePlayer(){
+
+lives--
+
+document.getElementById("lives").innerText=lives
+
+if(lives<=0){
+
+alert("Game Over")
+location.reload()
+
+}
+
+}
+
+function killEnemy(e){
+
+if(e.hp<=0){
+
+score+=10
+
+document.getElementById("score").innerText=score
+
+enemies.splice(enemies.indexOf(e),1)
+
+}
+
+}
+
+function blood(x,y){
+
+for(let i=0;i<10;i++){
+
+particles.push({
+x:x,
+y:y,
+vx:(Math.random()-0.5)*6,
+vy:(Math.random()-0.5)*6,
+life:30
+})
 
 }
 
@@ -269,13 +269,13 @@ ctx.stroke()
 
 function explode(x,y){
 
-for(let i=0;i<20;i++){
+for(let i=0;i<30;i++){
 
 particles.push({
 x:x,
 y:y,
-vx:(Math.random()-0.5)*6,
-vy:(Math.random()-0.5)*6,
+vx:(Math.random()-0.5)*8,
+vy:(Math.random()-0.5)*8,
 life:40
 })
 
@@ -283,16 +283,18 @@ life:40
 
 }
 
-function spawnLevel(){
+function spawnEnemies(){
 
 enemies=[]
 
-for(let i=0;i<level+1;i++){
+let count=level+1
 
-let x = canvas.width-200-Math.random()*400
-let y = canvas.height-100-Math.random()*300
+for(let i=0;i<count;i++){
 
-enemies.push(new Enemy(x,y))
+let x=canvas.width-200-Math.random()*400
+let y=canvas.height-100-Math.random()*200
+
+enemies.push(new Fighter(x,y,true))
 
 }
 
@@ -300,18 +302,20 @@ document.getElementById("level").innerText=level
 
 }
 
-let player = new Player(150,canvas.height-100)
+let player=new Fighter(150,canvas.height-100,false)
 
-spawnLevel()
+spawnEnemies()
 
-canvas.onmousedown=e=>{
-mouseDown=true
+canvas.onmousedown=()=>{
+
+charging=true
 power=0
+
 }
 
-canvas.onmouseup=e=>{
+canvas.onmouseup=()=>{
 
-mouseDown=false
+charging=false
 
 let angle=Math.atan2(aimY-player.y,aimX-player.x)
 
@@ -323,34 +327,63 @@ arrows.push(new Arrow(player.x,player.y-20,vx,vy,false))
 }
 
 canvas.onmousemove=e=>{
+
 aimX=e.clientX
 aimY=e.clientY
+
+}
+
+canvas.ontouchstart=e=>{
+
+charging=true
+power=0
+
+}
+
+canvas.ontouchend=e=>{
+
+charging=false
+
+let angle=Math.atan2(aimY-player.y,aimX-player.x)
+
+arrows.push(new Arrow(player.x,player.y-20,Math.cos(angle)*power,Math.sin(angle)*power,false))
+
+}
+
+canvas.ontouchmove=e=>{
+
+aimX=e.touches[0].clientX
+aimY=e.touches[0].clientY
+
 }
 
 function update(){
 
-if(mouseDown){
+if(charging){
 
-power+=0.2
-if(power>12) power=12
+power+=0.25
+if(power>18) power=18
 
 }
 
-arrows = arrows.filter(a=>!a.update())
-
 for(let e of enemies) e.update()
 
+arrows=arrows.filter(a=>!a.update())
+
 particles=particles.filter(p=>{
+
 p.x+=p.vx
 p.y+=p.vy
 p.life--
+
 return p.life>0
+
 })
 
 if(enemies.length==0){
 
 level++
-spawnLevel()
+spawnEnemies()
 
 }
 
@@ -360,16 +393,18 @@ function draw(){
 
 ctx.clearRect(0,0,canvas.width,canvas.height)
 
+ctx.fillStyle="#1a1a1a"
+ctx.fillRect(0,canvas.height-60,canvas.width,60)
+
 player.draw()
 
 for(let e of enemies) e.draw()
 
 for(let a of arrows) a.draw()
 
-ctx.fillStyle="orange"
-
 for(let p of particles){
 
+ctx.fillStyle="red"
 ctx.fillRect(p.x,p.y,3,3)
 
 }
