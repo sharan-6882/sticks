@@ -1,478 +1,408 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Ultimate Ragdoll Archers</title>
-
-<style>
-body{
-margin:0;
-overflow:hidden;
-background:#0b0b0b;
-color:white;
-font-family:Arial;
-}
-
-#ui{
-position:absolute;
-top:10px;
-left:10px;
-font-size:18px;
-}
-
-canvas{
-display:block;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ragdoll Archers - Replica</title>
+  <style>
+    :root {
+      --bg: #3d4046;
+      --stone: #585b62;
+      --stone-dark: #4c4f56;
+      --health: #e74c3c;
+      --armor: #4aa3ff;
+      --text: #f5f7fb;
+      --arrow: #f0f0f0;
+      --bow: #d49700;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #202226;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      overflow: hidden;
+      user-select: none;
+    }
+    canvas { display: block; }
+    #hud {
+      position: fixed;
+      top: 10px;
+      left: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      background: rgba(0,0,0,0.25);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
+    #hud-right {
+      position: fixed;
+      top: 10px;
+      right: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      background: rgba(0,0,0,0.25);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
+    #help {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      font-size: 13px;
+      background: rgba(0,0,0,0.35);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
+  </style>
 </head>
-
 <body>
-
-<div id="ui">
-❤️ Lives: <span id="lives">5</span><br>
-🎯 Level: <span id="level">1</span><br>
-🏆 Score: <span id="score">0</span><br>
-🎯 AutoAim: <span id="auto">3</span>
-</div>
-
-<canvas id="game"></canvas>
-
-<script>
-
-const canvas=document.getElementById("game")
-const ctx=canvas.getContext("2d")
-
-canvas.width=window.innerWidth
-canvas.height=window.innerHeight
-
-let gravity=0.22
-let arrows=[]
-let enemies=[]
-let particles=[]
-
-let level=1
-let score=0
-let lives=5
-let autoAim=3
-
-let aimX=0
-let aimY=0
-let power=0
-let charging=false
-
-class Fighter{
-
-constructor(x,y,enemy=false){
-
-this.x=x
-this.y=y
-this.enemy=enemy
-this.hp=100
-this.cool=220
-
-}
-
-draw(){
-
-ctx.strokeStyle=this.enemy?"red":"white"
-ctx.lineWidth=4
-
-ctx.beginPath()
-ctx.arc(this.x,this.y-40,10,0,Math.PI*2)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-30)
-ctx.lineTo(this.x,this.y)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-20)
-ctx.lineTo(this.x-20,this.y-5)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y-20)
-ctx.lineTo(this.x+20,this.y-5)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x-15,this.y+30)
-ctx.stroke()
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x+15,this.y+30)
-ctx.stroke()
-
-}
-
-update(){
-
-if(!this.enemy) return
-
-this.cool--
-
-if(this.cool<=0){
-
-shootEnemy(this)
-
-this.cool=220+Math.random()*150
-
-}
-
-}
-
-}
-
-class Arrow{
-
-constructor(x,y,vx,vy,enemy=false){
-
-this.x=x
-this.y=y
-this.vx=vx
-this.vy=vy
-this.enemy=enemy
-this.explode=Math.random()<0.15
-
-}
-
-update(){
-
-this.vy+=gravity
-this.x+=this.vx
-this.y+=this.vy
-
-if(this.enemy){
-
-let d=Math.hypot(player.x-this.x,player.y-this.y)
-
-if(d<25){
-
-damagePlayer()
-
-if(this.explode) explode(this.x,this.y)
-
-return true
-
-}
-
-}else{
-
-for(let e of enemies){
-
-let head=Math.hypot(e.x-this.x,e.y-40-this.y)
-
-if(head<10){
-
-e.hp-=80
-blood(this.x,this.y)
-killEnemy(e)
-
-return true
-
-}
-
-let body=Math.hypot(e.x-this.x,e.y-this.y)
-
-if(body<20){
-
-e.hp-=40
-blood(this.x,this.y)
-killEnemy(e)
-
-return true
-
-}
-
-}
-
-}
-
-if(this.y>canvas.height){
-
-if(this.explode) explode(this.x,this.y)
-
-return true
-
-}
-
-return false
-
-}
-
-draw(){
-
-ctx.strokeStyle=this.explode?"orange":"yellow"
-
-ctx.beginPath()
-ctx.moveTo(this.x,this.y)
-ctx.lineTo(this.x-this.vx*2,this.y-this.vy*2)
-ctx.stroke()
-
-}
-
-}
-
-function shootEnemy(e){
-
-let dx=player.x-e.x
-let dy=player.y-e.y
-
-let dist=Math.sqrt(dx*dx+dy*dy)
-
-let speed=11
-
-let accuracy = 0.15 - level*0.01
-if(accuracy<0.02) accuracy=0.02
-
-let vx=dx/dist*speed+(Math.random()-0.5)*accuracy
-let vy=dy/dist*speed - dist*0.01+(Math.random()-0.5)*accuracy
-
-arrows.push(new Arrow(e.x,e.y-20,vx,vy,true))
-
-}
-
-function shootPlayer(){
-
-let angle
-
-if(autoAim>0 && enemies.length>0){
-
-let target=enemies[0]
-
-angle=Math.atan2(target.y-player.y,target.x-player.x)
-
-autoAim--
-document.getElementById("auto").innerText=autoAim
-
-}else{
-
-angle=Math.atan2(aimY-player.y,aimX-player.x)
-
-}
-
-let vx=Math.cos(angle)*power
-let vy=Math.sin(angle)*power
-
-arrows.push(new Arrow(player.x,player.y-20,vx,vy,false))
-
-}
-
-function damagePlayer(){
-
-lives--
-
-document.getElementById("lives").innerText=lives
-
-if(lives<=0){
-
-alert("Game Over")
-location.reload()
-
-}
-
-}
-
-function killEnemy(e){
-
-if(e.hp<=0){
-
-score+=10
-
-document.getElementById("score").innerText=score
-
-enemies.splice(enemies.indexOf(e),1)
-
-}
-
-}
-
-function blood(x,y){
-
-for(let i=0;i<10;i++){
-
-particles.push({
-x:x,
-y:y,
-vx:(Math.random()-0.5)*6,
-vy:(Math.random()-0.5)*6,
-life:30
-})
-
-}
-
-}
-
-function explode(x,y){
-
-for(let i=0;i<30;i++){
-
-particles.push({
-x:x,
-y:y,
-vx:(Math.random()-0.5)*8,
-vy:(Math.random()-0.5)*8,
-life:40
-})
-
-}
-
-}
-
-function spawnEnemies(){
-
-enemies=[]
-
-let count=level+1
-
-for(let i=0;i<count;i++){
-
-let x=canvas.width-200-Math.random()*400
-let y=canvas.height-100-Math.random()*200
-
-enemies.push(new Fighter(x,y,true))
-
-}
-
-document.getElementById("level").innerText=level
-
-}
-
-let player=new Fighter(150,canvas.height-100,false)
-
-spawnEnemies()
-
-canvas.onmousedown=()=>{
-
-charging=true
-power=0
-
-}
-
-canvas.onmouseup=()=>{
-
-charging=false
-shootPlayer()
-
-}
-
-canvas.onmousemove=e=>{
-
-aimX=e.clientX
-aimY=e.clientY
-
-}
-
-function drawPrediction(){
-
-if(!charging) return
-
-let angle=Math.atan2(aimY-player.y,aimX-player.x)
-
-let vx=Math.cos(angle)*power
-let vy=Math.sin(angle)*power
-
-let px=player.x
-let py=player.y-20
-
-ctx.strokeStyle="rgba(255,255,255,0.3)"
-ctx.beginPath()
-
-for(let i=0;i<60;i++){
-
-px+=vx
-py+=vy
-vy+=gravity
-
-ctx.lineTo(px,py)
-
-}
-
-ctx.stroke()
-
-}
-
-function update(){
-
-if(charging){
-
-power+=0.35
-if(power>25) power=25
-
-}
-
-for(let e of enemies) e.update()
-
-arrows=arrows.filter(a=>!a.update())
-
-particles=particles.filter(p=>{
-
-p.x+=p.vx
-p.y+=p.vy
-p.life--
-
-return p.life>0
-
-})
-
-if(enemies.length==0){
-
-level++
-spawnEnemies()
-
-}
-
-}
-
-function draw(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height)
-
-ctx.fillStyle="#1a1a1a"
-ctx.fillRect(0,canvas.height-60,canvas.width,60)
-
-player.draw()
-
-for(let e of enemies) e.draw()
-
-for(let a of arrows) a.draw()
-
-for(let p of particles){
-
-ctx.fillStyle="red"
-ctx.fillRect(p.x,p.y,3,3)
-
-}
-
-drawPrediction()
-
-if(charging){
-
-ctx.strokeStyle="white"
-ctx.beginPath()
-ctx.moveTo(player.x,player.y-20)
-ctx.lineTo(aimX,aimY)
-ctx.stroke()
-
-}
-
-}
-
-function loop(){
-
-update()
-draw()
-
-requestAnimationFrame(loop)
-
-}
-
-loop()
-
-</script>
-
+  <div id="hud">KILLS: <span id="kills">0</span>/7</div>
+  <div id="hud-right">SCORE: <span id="score">0</span>/7</div>
+  <div id="help">Hold to draw, release to shoot. Hit the flying apple to heal.</div>
+  <canvas id="game"></canvas>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      updateTowers();
+      if (player) {
+        player.x = towers.left.x + towers.left.w * 0.35;
+        player.ground = towers.left.y;
+        player.y = player.ground - 120;
+      }
+      if (enemy) {
+        enemy.x = towers.right.x + towers.right.w * 0.5;
+        enemy.ground = towers.right.y;
+        enemy.y = enemy.ground - 120;
+      }
+    }
+    window.addEventListener('resize', resize);
+
+    // ---------- Constants ----------
+    const GRAVITY = 0.08;
+    const DRAG = 0.998;
+    const FLOOR = () => canvas.height - 120;
+    const MAX_POWER = 24;
+    const TARGET_KILLS = 7;
+    const STONE_A = '#585b62';
+    const STONE_B = '#50535a';
+    const HEALTH_COLOR = '#e74c3c';
+    const ARMOR_COLOR = '#4aa3ff';
+    const ARROW_COLOR = '#f0f0f0';
+    const BOW_COLOR = '#d49700';
+    const SKY_COLOR = '#3f4147';
+
+    // ---------- State ----------
+    let kills = 0;
+    let score = 0;
+    let mouse = {x: canvas.width * 0.4, y: canvas.height * 0.4, down: false};
+    let power = 0;
+
+    const towers = {
+      left: {x: 160, y: FLOOR(), w: 180, h: 180},
+      right: {x: canvas.width - 220, y: FLOOR() + 40, w: 110, h: 110}
+    };
+
+    function updateTowers() {
+      towers.left.x = 160;
+      towers.left.y = FLOOR();
+      towers.left.w = 180;
+      towers.left.h = 180;
+      towers.right.x = canvas.width - 220;
+      towers.right.y = FLOOR() + 40;
+      towers.right.w = 110;
+      towers.right.h = 110;
+    }
+
+    function makeArcher(x, ground) {
+      return {
+        x, y: ground - 120,
+        ground,
+        hp: 100,
+        armor: 95,
+        alive: true,
+        aim: -Math.PI/4,
+        cooldown: 90 + Math.random()*40
+      };
+    }
+
+    let player = makeArcher(towers.left.x + towers.left.w * 0.35, towers.left.y);
+    let enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
+    enemy.ai = true;
+    resize();
+
+    const arrows = [];
+    let apple = null;
+    let appleTimer = 280;
+    let resetting = false;
+
+    const stars = Array.from({length: 120}, () => ({
+      x: Math.random()*1,
+      y: Math.random()*1,
+      b: Math.random()*0.5+0.2
+    }));
+
+    // ---------- Helpers ----------
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    function spawnApple() {
+      apple = {
+        x: Math.random() < 0.5 ? 120 : canvas.width - 120,
+        y: 160 + Math.random()*140,
+        vx: (Math.random()<0.5?-1:1) * (2.2 + Math.random()*1.5),
+        life: 180
+      };
+    }
+
+    function shoot(from, angle, speed, fromEnemy=false) {
+      arrows.push({
+        x: from.x,
+        y: from.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        fromEnemy,
+        stuck:false,
+        life:0
+      });
+    }
+
+    // ---------- Input ----------
+    canvas.addEventListener('mousedown', e => { mouse.down = true; power = 0; });
+    canvas.addEventListener('mouseup', e => { if (mouse.down) playerShoot(); mouse.down = false; });
+    canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    canvas.addEventListener('touchstart', e => { const t=e.touches[0]; mouse.x=t.clientX; mouse.y=t.clientY; mouse.down=true; power=0; e.preventDefault(); }, {passive:false});
+    canvas.addEventListener('touchmove', e => { const t=e.touches[0]; mouse.x=t.clientX; mouse.y=t.clientY; e.preventDefault(); }, {passive:false});
+    canvas.addEventListener('touchend', e => { if (mouse.down) playerShoot(); mouse.down=false; e.preventDefault(); }, {passive:false});
+
+    function playerShoot() {
+      if (!player.alive) return;
+      const angle = Math.atan2(mouse.y - (player.y-20), mouse.x - player.x);
+      const speed = 10 + power * 0.9;
+      shoot({x: player.x, y: player.y-20}, angle, speed, false);
+    }
+
+    // ---------- Update ----------
+    function update() {
+      if (mouse.down) power = clamp(power + 0.35, 0, MAX_POWER);
+
+      // player aim
+      if (player.alive) {
+        player.aim = Math.atan2(mouse.y - (player.y-20), mouse.x - player.x);
+      }
+
+      // enemy AI
+      if (enemy.alive) {
+        enemy.cooldown--;
+        if (enemy.cooldown <= 0) {
+          const target = player;
+          const ang = Math.atan2((target.y-20) - (enemy.y-20), target.x - enemy.x) + (Math.random()-0.5)*0.04;
+          enemy.aim = ang;
+          shoot({x: enemy.x, y: enemy.y-20}, ang, 10 + Math.random()*4, true);
+          enemy.cooldown = 90 + Math.random()*40;
+        }
+      }
+
+      // arrows
+      for (const a of arrows) {
+        if (a.stuck) continue;
+        a.life++;
+        a.vx *= DRAG;
+        a.vy = (a.vy + GRAVITY) * DRAG;
+        a.x += a.vx;
+        a.y += a.vy;
+
+        // floor
+        if (a.y > FLOOR()) { a.y = FLOOR(); a.stuck = true; continue; }
+
+        // collisions
+        const target = a.fromEnemy ? player : enemy;
+        if (target.alive) {
+          const dx = a.x - target.x;
+          const dy = a.y - (target.y-40);
+          const dist = Math.hypot(dx, dy);
+          if (dist < 22) {
+            const dmg = 18;
+            if (target.armor > 0) target.armor = Math.max(0, target.armor - dmg);
+            else target.hp = Math.max(0, target.hp - dmg);
+            a.stuck = true;
+            if (target.hp <= 0) {
+              target.alive = false;
+              if (!a.fromEnemy) {
+                kills++; score = Math.min(TARGET_KILLS, score + 1);
+                document.getElementById('kills').textContent = kills;
+                document.getElementById('score').textContent = score;
+              }
+            }
+          }
+        }
+
+        // apple hit
+        if (apple && !a.stuck) {
+          const adx = a.x - apple.x;
+          const ady = a.y - apple.y;
+          if (Math.hypot(adx, ady) < 14) {
+            apple = null;
+            if (player.hp < 100) player.hp = clamp(player.hp + 15, 0, 100);
+          }
+        }
+      }
+      // trim arrow list
+      for (let i = arrows.length - 1; i >= 0; i--) {
+        if (arrows[i].life > 700) arrows.splice(i, 1);
+      }
+
+      // apple
+      if (!apple) {
+        appleTimer--;
+        if (appleTimer <= 0) { spawnApple(); appleTimer = 280 + Math.random()*120; }
+      } else {
+        apple.x += apple.vx;
+        apple.life--;
+        if (apple.x < 40 || apple.x > canvas.width-40) apple.vx *= -1;
+        if (apple.life <= 0) apple = null;
+      }
+
+      // respawn enemy when dead
+      if (!enemy.alive && kills < TARGET_KILLS) {
+        enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
+        enemy.ai = true;
+      }
+
+      // reset on win or death
+      const needReset = (kills >= TARGET_KILLS) || (!player.alive);
+      if (needReset && !resetting) {
+        resetting = true;
+        setTimeout(() => {
+          kills = 0; score = 0;
+          player = makeArcher(towers.left.x + towers.left.w * 0.35, towers.left.y);
+          enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
+          enemy.ai = true;
+          player.alive = true;
+          arrows.length = 0;
+          apple = null;
+          appleTimer = 280;
+          resetting = false;
+          document.getElementById('kills').textContent = kills;
+          document.getElementById('score').textContent = score;
+        }, 1200);
+      }
+    }
+
+    // ---------- Draw ----------
+    function drawBackground() {
+      ctx.fillStyle = SKY_COLOR;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff22';
+      for (const s of stars) {
+        const x = s.x * canvas.width;
+        const y = s.y * canvas.height;
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+
+    function drawTower(t) {
+      const block = 40;
+      for (let y = 0; y < t.h; y += block) {
+        for (let x = 0; x < t.w; x += block) {
+          ctx.fillStyle = (x/block + y/block) % 2 === 0 ? STONE_A : STONE_B;
+          ctx.fillRect(t.x + x, t.y - y - block, block, block);
+        }
+      }
+    }
+
+    function drawBars(ch, cv, hp, armor) {
+      const w = 70, h = 8;
+      ctx.fillStyle = '#2c2f36';
+      ctx.fillRect(ch - w/2, cv, w, h*2+6);
+      ctx.fillStyle = HEALTH_COLOR; ctx.fillRect(ch - w/2, cv, w * (hp/100), h);
+      ctx.fillStyle = ARMOR_COLOR; ctx.fillRect(ch - w/2, cv + h + 2, w * (armor/100), h);
+    }
+
+    function drawArcher(a) {
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      // body
+      ctx.fillStyle = '#f5f5f5';
+      ctx.beginPath(); ctx.arc(0, -20, 16, 0, Math.PI*2); ctx.fill(); // head
+      ctx.fillRect(-10, -18, 20, 36); // torso
+      ctx.fillRect(-16, 18, 10, 32); // left leg
+      ctx.fillRect(6, 18, 10, 32); // right leg
+      // bow
+      ctx.strokeStyle = BOW_COLOR;
+      ctx.lineWidth = 4;
+      const handX = Math.cos(a.aim) * 36;
+      const handY = Math.sin(a.aim) * 36 - 10;
+      ctx.beginPath();
+      ctx.moveTo(-6, -8);
+      ctx.lineTo(handX, handY);
+      ctx.stroke();
+      ctx.restore();
+      drawBars(a.x, a.y + 30, a.hp, a.armor);
+    }
+
+    function drawArrows() {
+      ctx.strokeStyle = ARROW_COLOR;
+      ctx.lineWidth = 2;
+      for (const a of arrows) {
+        const ang = Math.atan2(a.vy, a.vx);
+        const len = 22;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(a.x - Math.cos(ang)*len, a.y - Math.sin(ang)*len);
+        ctx.stroke();
+      }
+    }
+
+    function drawApple() {
+      if (!apple) return;
+      ctx.fillStyle = '#f6b000';
+      ctx.beginPath(); ctx.arc(apple.x, apple.y, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#2ecc71'; ctx.fillRect(apple.x-2, apple.y-14, 4, 8);
+    }
+
+    function loop() {
+      update();
+
+      drawBackground();
+      // floating obstacle for visual parity
+      ctx.save();
+      ctx.translate(230, 230);
+      ctx.rotate(-0.35);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(-90, -90, 180, 180);
+      ctx.restore();
+      drawTower(towers.left);
+      drawTower(towers.right);
+      drawArcher(player);
+      drawArcher(enemy);
+      drawArrows();
+      drawApple();
+
+      // prediction
+      if (mouse.down && player.alive) {
+        ctx.strokeStyle = '#ffffff55';
+        ctx.beginPath();
+        let px = player.x, py = player.y-20;
+        let vx = Math.cos(Math.atan2(mouse.y - (player.y-20), mouse.x - player.x)) * (10 + power*0.9);
+        let vy = Math.sin(Math.atan2(mouse.y - (player.y-20), mouse.x - player.x)) * (10 + power*0.9);
+        ctx.moveTo(px, py);
+        for (let i=0;i<60;i++){
+          vx*=DRAG; vy=(vy+GRAVITY)*DRAG;
+          px+=vx; py+=vy;
+          ctx.lineTo(px, py);
+          if (py>FLOOR()) break;
+        }
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
 </body>
 </html>
