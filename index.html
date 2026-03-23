@@ -1,408 +1,389 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sticks game</title>
-  <style>
-    :root {
-      --bg: #3d4046;
-      --stone: #585b62;
-      --stone-dark: #4c4f56;
-      --health: #e74c3c;
-      --armor: #4aa3ff;
-      --text: #f5f7fb;
-      --arrow: #f0f0f0;
-      --bow: #d49700;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #202226;
-      font-family: "Segoe UI", Tahoma, sans-serif;
-      color: var(--text);
-      overflow: hidden;
-      user-select: none;
-    }
-    canvas { display: block; }
-    #hud {
-      position: fixed;
-      top: 10px;
-      left: 12px;
-      font-size: 14px;
-      font-weight: 700;
-      background: rgba(0,0,0,0.25);
-      padding: 8px 10px;
-      border-radius: 6px;
-    }
-    #hud-right {
-      position: fixed;
-      top: 10px;
-      right: 12px;
-      font-size: 14px;
-      font-weight: 700;
-      background: rgba(0,0,0,0.25);
-      padding: 8px 10px;
-      border-radius: 6px;
-    }
-    #help {
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      font-size: 13px;
-      background: rgba(0,0,0,0.35);
-      padding: 8px 10px;
-      border-radius: 6px;
-    }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stick Archers ULTIMATE</title>
+
+<style>
+body { margin:0; overflow:hidden; font-family:sans-serif; background:#111; color:white; }
+canvas { display:block; }
+
+/* HUD */
+#hud{
+ position:fixed; top:10px; left:10px;
+ background:rgba(0,0,0,0.6);
+ padding:12px; border-radius:10px;
+}
+
+/* panels */
+.panel{
+ position:fixed;
+ background:#1c1c1c;
+ padding:10px;
+ border-radius:10px;
+}
+
+/* shop */
+#shop{ top:10px; right:10px; }
+
+/* skill tree */
+#skills{
+ bottom:10px; left:10px;
+ display:flex; gap:10px;
+}
+
+.node{
+ width:50px; height:50px;
+ border-radius:50%;
+ background:#333;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ cursor:pointer;
+}
+.node.active{ background:#4caf50; }
+
+/* controls */
+#controls{
+ position:fixed;
+ bottom:20px; right:20px;
+}
+.btn{
+ width:70px; height:70px;
+ border-radius:50%;
+ background:#444;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+}
+
+/* skin selector */
+#skins{
+ bottom:10px; right:10px;
+}
+
+button{
+ margin:3px;
+ padding:6px;
+}
+</style>
 </head>
+
 <body>
-  <div id="hud">KILLS: <span id="kills">0</span>/7</div>
-  <div id="hud-right">SCORE: <span id="score">0</span>/7</div>
-  <div id="help">Hold to draw, release to shoot. Hit the flying apple to heal.</div>
-  <canvas id="game"></canvas>
 
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      updateTowers();
-      if (player) {
-        player.x = towers.left.x + towers.left.w * 0.35;
-        player.ground = towers.left.y;
-        player.y = player.ground - 120;
-      }
-      if (enemy) {
-        enemy.x = towers.right.x + towers.right.w * 0.5;
-        enemy.ground = towers.right.y;
-        enemy.y = enemy.ground - 120;
-      }
+<div id="hud">
+<div id="name"></div>
+Score: <span id="score">0</span><br>
+High: <span id="high">0</span><br>
+Level: <span id="level">1</span><br>
+Coins: <span id="coins">0</span><br>
+IP: <span id="ip">...</span><br>
+Aim Assist: <span id="aimState">ON</span>
+</div>
+
+<div id="shop" class="panel">
+<b>Shop</b><br>
+<button onclick="buyDamage()">DMG</button>
+<button onclick="buyHP()">HP</button>
+<button onclick="buyArmor()">ARMOR</button>
+</div>
+
+<div id="skills" class="panel"></div>
+
+<div id="skins" class="panel">
+<b>Skins</b><br>
+<button onclick="setSkin('white')">Default</button>
+<button onclick="setSkin('cyan')">Cyan</button>
+<button onclick="setSkin('red')">Red</button>
+</div>
+
+<div id="controls">
+<div class="btn" id="shootBtn">FIRE</div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+// ===== CANVAS =====
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+resize(); addEventListener("resize", resize);
+
+// ===== SAVE =====
+let save = JSON.parse(localStorage.getItem("save")) || {
+ name:null, high:0, coins:0,
+ dmg:20, maxHP:100, maxArmor:100,
+ skills:{damage:0,health:0,crit:0},
+ inventory:["normal","fire"],
+ currentWeapon:"normal",
+ skin:"white"
+};
+
+// ===== USER =====
+if(!save.name){
+ save.name = prompt("Enter name:");
+}
+document.getElementById("name").textContent = save.name;
+
+// ===== IP =====
+let userIP = localStorage.getItem("ip") || "...";
+fetch("https://api.ipify.org?format=json")
+.then(r=>r.json())
+.then(d=>{
+ userIP=d.ip;
+ localStorage.setItem("ip",userIP);
+});
+document.getElementById("ip").textContent=userIP;
+
+// ===== GAME STATE =====
+let state="menu";
+let score=0, level=1;
+let wind=0;
+let aimAssist=true;
+
+// ===== PLAYER =====
+function make(x){
+ return {
+  x,
+  y:canvas.height-140,
+  hp:save.maxHP,
+  armor:save.maxArmor,
+  alive:true,
+  boss:false
+ };
+}
+let player=make(200);
+let enemy=make(innerWidth-200);
+
+// ===== INPUT =====
+let mouse={x:0,y:0,down:false};
+let power=0;
+
+canvas.onmousemove=e=>{
+ mouse.x=e.clientX;
+ mouse.y=e.clientY;
+};
+canvas.onmousedown=()=>mouse.down=true;
+canvas.onmouseup=()=>{ fire(); mouse.down=false; power=0; };
+
+// mobile
+document.getElementById("shootBtn").ontouchstart=()=>mouse.down=true;
+document.getElementById("shootBtn").ontouchend=()=>{
+ fire(); mouse.down=false; power=0;
+};
+
+// ===== WEAPONS =====
+const weapons={
+ normal:{dmg:20},
+ fire:{dmg:15,fire:true}
+};
+
+// ===== ARROWS =====
+let arrows=[];
+
+function fire(){
+ let angle = Math.atan2(mouse.y-player.y, mouse.x-player.x);
+
+ if(aimAssist){
+   angle = solveAim(player, enemy, 12+power);
+ }
+
+ let w=weapons[save.currentWeapon];
+
+ arrows.push({
+  x:player.x,
+  y:player.y,
+  vx:Math.cos(angle)*(12+power),
+  vy:Math.sin(angle)*(12+power),
+  dmg:w.dmg,
+  fire:w.fire||false,
+  enemy:false
+ });
+}
+
+// ===== PHYSICS AI =====
+function solveAim(p,t,speed){
+ let dx=t.x-p.x;
+ let dy=t.y-p.y;
+ let g=0.2;
+
+ let part = speed**4 - g*(g*dx*dx + 2*dy*speed*speed);
+ if(part<0) return Math.atan2(dy,dx);
+
+ return Math.atan((speed*speed - Math.sqrt(part)) / (g*dx));
+}
+
+// ===== SHOP =====
+function buyDamage(){ if(save.coins>=5){ save.coins-=5; save.dmg+=5; } }
+function buyHP(){ if(save.coins>=5){ save.coins-=5; save.maxHP+=20; } }
+function buyArmor(){ if(save.coins>=5){ save.coins-=5; save.maxArmor+=20; } }
+
+// ===== SKILLS =====
+function renderSkills(){
+ let el=document.getElementById("skills");
+ el.innerHTML="";
+ for(let k in save.skills){
+  let n=document.createElement("div");
+  n.className="node "+(save.skills[k]?"active":"");
+  n.innerText=k[0].toUpperCase();
+  n.onclick=()=>{
+    if(save.coins>=10){
+      save.coins-=10;
+      save.skills[k]++;
+      renderSkills();
     }
-    window.addEventListener('resize', resize);
+  };
+  el.appendChild(n);
+ }
+}
+renderSkills();
 
-    // ---------- Constants ----------
-    const GRAVITY = 0.08;
-    const DRAG = 0.998;
-    const FLOOR = () => canvas.height - 120;
-    const MAX_POWER = 24;
-    const TARGET_KILLS = 7;
-    const STONE_A = '#585b62';
-    const STONE_B = '#50535a';
-    const HEALTH_COLOR = '#e74c3c';
-    const ARMOR_COLOR = '#4aa3ff';
-    const ARROW_COLOR = '#f0f0f0';
-    const BOW_COLOR = '#d49700';
-    const SKY_COLOR = '#3f4147';
+// ===== SKINS =====
+function setSkin(s){
+ save.skin=s;
+}
 
-    // ---------- State ----------
-    let kills = 0;
-    let score = 0;
-    let mouse = {x: canvas.width * 0.4, y: canvas.height * 0.4, down: false};
-    let power = 0;
+// ===== UPDATE =====
+function update(){
 
-    const towers = {
-      left: {x: 160, y: FLOOR(), w: 180, h: 180},
-      right: {x: canvas.width - 220, y: FLOOR() + 40, w: 110, h: 110}
-    };
+ if(mouse.down) power=Math.min(power+0.4,25);
 
-    function updateTowers() {
-      towers.left.x = 160;
-      towers.left.y = FLOOR();
-      towers.left.w = 180;
-      towers.left.h = 180;
-      towers.right.x = canvas.width - 220;
-      towers.right.y = FLOOR() + 40;
-      towers.right.w = 110;
-      towers.right.h = 110;
-    }
+ // enemy AI using same solver
+ if(enemy.alive && Math.random()<0.02){
+  let ang=solveAim(enemy, player, 10);
+  arrows.push({
+    x:enemy.x,
+    y:enemy.y,
+    vx:Math.cos(ang)*10,
+    vy:Math.sin(ang)*10,
+    enemy:true
+  });
+ }
 
-    function makeArcher(x, ground) {
-      return {
-        x, y: ground - 120,
-        ground,
-        hp: 100,
-        armor: 95,
-        alive: true,
-        aim: -Math.PI/4,
-        cooldown: 90 + Math.random()*40
-      };
-    }
+ for(let a of arrows){
+  a.vy+=0.2;
+  a.x+=a.vx;
+  a.y+=a.vy;
 
-    let player = makeArcher(towers.left.x + towers.left.w * 0.35, towers.left.y);
-    let enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
-    enemy.ai = true;
-    resize();
+  let t=a.enemy?player:enemy;
 
-    const arrows = [];
-    let apple = null;
-    let appleTimer = 280;
-    let resetting = false;
+  if(t.alive && Math.hypot(a.x-t.x,a.y-t.y)<20){
 
-    const stars = Array.from({length: 120}, () => ({
-      x: Math.random()*1,
-      y: Math.random()*1,
-      b: Math.random()*0.5+0.2
-    }));
+   let dmg = save.dmg + save.skills.damage*5;
+   if(a.y < t.y-30) dmg*=2;
 
-    // ---------- Helpers ----------
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+   if(a.fire){
+     for(let obj of [player,enemy]){
+       if(Math.hypot(obj.x-a.x,obj.y-a.y)<80){
+         obj.hp-=10;
+       }
+     }
+   }
 
-    function spawnApple() {
-      apple = {
-        x: Math.random() < 0.5 ? 120 : canvas.width - 120,
-        y: 160 + Math.random()*140,
-        vx: (Math.random()<0.5?-1:1) * (2.2 + Math.random()*1.5),
-        life: 180
-      };
-    }
+   if(t.armor>0) t.armor-=dmg;
+   else t.hp-=dmg;
 
-    function shoot(from, angle, speed, fromEnemy=false) {
-      arrows.push({
-        x: from.x,
-        y: from.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        fromEnemy,
-        stuck:false,
-        life:0
-      });
-    }
+   if(t.hp<=0){
+    t.alive=false;
 
-    // ---------- Input ----------
-    canvas.addEventListener('mousedown', e => { mouse.down = true; power = 0; });
-    canvas.addEventListener('mouseup', e => { if (mouse.down) playerShoot(); mouse.down = false; });
-    canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-    canvas.addEventListener('touchstart', e => { const t=e.touches[0]; mouse.x=t.clientX; mouse.y=t.clientY; mouse.down=true; power=0; e.preventDefault(); }, {passive:false});
-    canvas.addEventListener('touchmove', e => { const t=e.touches[0]; mouse.x=t.clientX; mouse.y=t.clientY; e.preventDefault(); }, {passive:false});
-    canvas.addEventListener('touchend', e => { if (mouse.down) playerShoot(); mouse.down=false; e.preventDefault(); }, {passive:false});
+    if(!a.enemy){
+      score++;
+      save.coins+=2;
+      level++;
 
-    function playerShoot() {
-      if (!player.alive) return;
-      const angle = Math.atan2(mouse.y - (player.y-20), mouse.x - player.x);
-      const speed = 10 + power * 0.9;
-      shoot({x: player.x, y: player.y-20}, angle, speed, false);
-    }
-
-    // ---------- Update ----------
-    function update() {
-      if (mouse.down) power = clamp(power + 0.35, 0, MAX_POWER);
-
-      // player aim
-      if (player.alive) {
-        player.aim = Math.atan2(mouse.y - (player.y-20), mouse.x - player.x);
-      }
-
-      // enemy AI
-      if (enemy.alive) {
-        enemy.cooldown--;
-        if (enemy.cooldown <= 0) {
-          const target = player;
-          const ang = Math.atan2((target.y-20) - (enemy.y-20), target.x - enemy.x) + (Math.random()-0.5)*0.04;
-          enemy.aim = ang;
-          shoot({x: enemy.x, y: enemy.y-20}, ang, 10 + Math.random()*4, true);
-          enemy.cooldown = 90 + Math.random()*40;
-        }
-      }
-
-      // arrows
-      for (const a of arrows) {
-        if (a.stuck) continue;
-        a.life++;
-        a.vx *= DRAG;
-        a.vy = (a.vy + GRAVITY) * DRAG;
-        a.x += a.vx;
-        a.y += a.vy;
-
-        // floor
-        if (a.y > FLOOR()) { a.y = FLOOR(); a.stuck = true; continue; }
-
-        // collisions
-        const target = a.fromEnemy ? player : enemy;
-        if (target.alive) {
-          const dx = a.x - target.x;
-          const dy = a.y - (target.y-40);
-          const dist = Math.hypot(dx, dy);
-          if (dist < 22) {
-            const dmg = 18;
-            if (target.armor > 0) target.armor = Math.max(0, target.armor - dmg);
-            else target.hp = Math.max(0, target.hp - dmg);
-            a.stuck = true;
-            if (target.hp <= 0) {
-              target.alive = false;
-              if (!a.fromEnemy) {
-                kills++; score = Math.min(TARGET_KILLS, score + 1);
-                document.getElementById('kills').textContent = kills;
-                document.getElementById('score').textContent = score;
-              }
-            }
-          }
-        }
-
-        // apple hit
-        if (apple && !a.stuck) {
-          const adx = a.x - apple.x;
-          const ady = a.y - apple.y;
-          if (Math.hypot(adx, ady) < 14) {
-            apple = null;
-            if (player.hp < 100) player.hp = clamp(player.hp + 15, 0, 100);
-          }
-        }
-      }
-      // trim arrow list
-      for (let i = arrows.length - 1; i >= 0; i--) {
-        if (arrows[i].life > 700) arrows.splice(i, 1);
-      }
-
-      // apple
-      if (!apple) {
-        appleTimer--;
-        if (appleTimer <= 0) { spawnApple(); appleTimer = 280 + Math.random()*120; }
-      } else {
-        apple.x += apple.vx;
-        apple.life--;
-        if (apple.x < 40 || apple.x > canvas.width-40) apple.vx *= -1;
-        if (apple.life <= 0) apple = null;
-      }
-
-      // respawn enemy when dead
-      if (!enemy.alive && kills < TARGET_KILLS) {
-        enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
-        enemy.ai = true;
-      }
-
-      // reset on win or death
-      const needReset = (kills >= TARGET_KILLS) || (!player.alive);
-      if (needReset && !resetting) {
-        resetting = true;
-        setTimeout(() => {
-          kills = 0; score = 0;
-          player = makeArcher(towers.left.x + towers.left.w * 0.35, towers.left.y);
-          enemy = makeArcher(towers.right.x + towers.right.w * 0.5, towers.right.y);
-          enemy.ai = true;
-          player.alive = true;
-          arrows.length = 0;
-          apple = null;
-          appleTimer = 280;
-          resetting = false;
-          document.getElementById('kills').textContent = kills;
-          document.getElementById('score').textContent = score;
-        }, 1200);
-      }
-    }
-
-    // ---------- Draw ----------
-    function drawBackground() {
-      ctx.fillStyle = SKY_COLOR;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff22';
-      for (const s of stars) {
-        const x = s.x * canvas.width;
-        const y = s.y * canvas.height;
-        ctx.fillRect(x, y, 2, 2);
-      }
-    }
-
-    function drawTower(t) {
-      const block = 40;
-      for (let y = 0; y < t.h; y += block) {
-        for (let x = 0; x < t.w; x += block) {
-          ctx.fillStyle = (x/block + y/block) % 2 === 0 ? STONE_A : STONE_B;
-          ctx.fillRect(t.x + x, t.y - y - block, block, block);
-        }
-      }
-    }
-
-    function drawBars(ch, cv, hp, armor) {
-      const w = 70, h = 8;
-      ctx.fillStyle = '#2c2f36';
-      ctx.fillRect(ch - w/2, cv, w, h*2+6);
-      ctx.fillStyle = HEALTH_COLOR; ctx.fillRect(ch - w/2, cv, w * (hp/100), h);
-      ctx.fillStyle = ARMOR_COLOR; ctx.fillRect(ch - w/2, cv + h + 2, w * (armor/100), h);
-    }
-
-    function drawArcher(a) {
-      ctx.save();
-      ctx.translate(a.x, a.y);
-      // body
-      ctx.fillStyle = '#f5f5f5';
-      ctx.beginPath(); ctx.arc(0, -20, 16, 0, Math.PI*2); ctx.fill(); // head
-      ctx.fillRect(-10, -18, 20, 36); // torso
-      ctx.fillRect(-16, 18, 10, 32); // left leg
-      ctx.fillRect(6, 18, 10, 32); // right leg
-      // bow
-      ctx.strokeStyle = BOW_COLOR;
-      ctx.lineWidth = 4;
-      const handX = Math.cos(a.aim) * 36;
-      const handY = Math.sin(a.aim) * 36 - 10;
-      ctx.beginPath();
-      ctx.moveTo(-6, -8);
-      ctx.lineTo(handX, handY);
-      ctx.stroke();
-      ctx.restore();
-      drawBars(a.x, a.y + 30, a.hp, a.armor);
-    }
-
-    function drawArrows() {
-      ctx.strokeStyle = ARROW_COLOR;
-      ctx.lineWidth = 2;
-      for (const a of arrows) {
-        const ang = Math.atan2(a.vy, a.vx);
-        const len = 22;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(a.x - Math.cos(ang)*len, a.y - Math.sin(ang)*len);
-        ctx.stroke();
-      }
-    }
-
-    function drawApple() {
-      if (!apple) return;
-      ctx.fillStyle = '#f6b000';
-      ctx.beginPath(); ctx.arc(apple.x, apple.y, 10, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#2ecc71'; ctx.fillRect(apple.x-2, apple.y-14, 4, 8);
-    }
-
-    function loop() {
-      update();
-
-      drawBackground();
-      // floating obstacle for visual parity
-      ctx.save();
-      ctx.translate(230, 230);
-      ctx.rotate(-0.35);
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
-      ctx.fillRect(-90, -90, 180, 180);
-      ctx.restore();
-      drawTower(towers.left);
-      drawTower(towers.right);
-      drawArcher(player);
-      drawArcher(enemy);
-      drawArrows();
-      drawApple();
-
-      // prediction
-      if (mouse.down && player.alive) {
-        ctx.strokeStyle = '#ffffff55';
-        ctx.beginPath();
-        let px = player.x, py = player.y-20;
-        let vx = Math.cos(Math.atan2(mouse.y - (player.y-20), mouse.x - player.x)) * (10 + power*0.9);
-        let vy = Math.sin(Math.atan2(mouse.y - (player.y-20), mouse.x - player.x)) * (10 + power*0.9);
-        ctx.moveTo(px, py);
-        for (let i=0;i<60;i++){
-          vx*=DRAG; vy=(vy+GRAVITY)*DRAG;
-          px+=vx; py+=vy;
-          ctx.lineTo(px, py);
-          if (py>FLOOR()) break;
-        }
-        ctx.stroke();
+      enemy=make(innerWidth-200);
+      if(level%5===0){
+        enemy.hp=300;
+        enemy.boss=true;
       }
 
-      requestAnimationFrame(loop);
+    } else {
+      state="over";
     }
+   }
+  }
+ }
 
-    loop();
-  </script>
+ document.getElementById("score").textContent=score;
+ document.getElementById("high").textContent=save.high;
+ document.getElementById("level").textContent=level;
+ document.getElementById("coins").textContent=save.coins;
+ document.getElementById("aimState").textContent=aimAssist?"ON":"OFF";
+
+ localStorage.setItem("save", JSON.stringify(save));
+}
+
+// ===== DRAW =====
+function draw(){
+
+ ctx.fillStyle="#1e2a38";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ drawPlayer(player);
+ drawPlayer(enemy);
+
+ // enemy HP bar
+ if(enemy.alive){
+  ctx.fillStyle="red";
+  ctx.fillRect(enemy.x-30, enemy.y-80, enemy.hp/2, 6);
+ }
+
+ // arrows
+ ctx.strokeStyle="#fff";
+ for(let a of arrows){
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y);
+  ctx.lineTo(a.x-a.vx*2,a.y-a.vy*2);
+  ctx.stroke();
+ }
+
+ if(state==="menu"){
+  ctx.fillText("CLICK TO START", canvas.width/2-80, canvas.height/2);
+ }
+ if(state==="over"){
+  ctx.fillText("GAME OVER - CLICK", canvas.width/2-100, canvas.height/2);
+ }
+}
+
+// ===== PLAYER DRAW =====
+function drawPlayer(p){
+ if(!p.alive) return;
+
+ let color = save.skin;
+
+ let anim = Math.sin(Date.now()*0.01)*5;
+
+ ctx.strokeStyle=color;
+
+ ctx.beginPath();
+ ctx.arc(p.x,p.y-50+anim,10,0,Math.PI*2);
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.moveTo(p.x,p.y-40);
+ ctx.lineTo(p.x,p.y);
+ ctx.stroke();
+}
+
+// ===== LOOP =====
+function loop(){
+ if(state==="playing") update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+
+// ===== START =====
+canvas.onclick=()=>{
+ if(state==="menu") state="playing";
+ else if(state==="over") location.reload();
+};
+
+// toggle aim assist
+window.addEventListener("keydown",e=>{
+ if(e.key==="q") aimAssist=!aimAssist;
+});
+</script>
 </body>
 </html>
