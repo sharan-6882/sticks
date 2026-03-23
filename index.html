@@ -121,49 +121,7 @@ let save = JSON.parse(localStorage.getItem("save")) || {
 };
 
 // ===== USER =====
-if(!save.name){
- save.name = prompt("Enter name:");
-}
-document.getElementById("name").textContent = save.name;
 
-let save = JSON.parse(localStorage.getItem("user")) || {};
-
-// ===== MAIN FUNCTION =====
-async function start() {
-
-  // ===== NAME =====
-  if (!save.name) {
-    save.name = prompt("Enter your name:");
-    localStorage.setItem("user", JSON.stringify(save));
-  }
-  document.getElementById("name").textContent = save.name;
-
-  // ===== GET IP =====
-  let ip = localStorage.getItem("ip");
-
-  if (!ip) {
-    try {
-      const res = await fetch("https://api.ipify.org?format=json");
-      const data = await res.json();
-      ip = data.ip;
-      localStorage.setItem("ip", ip);
-    } catch {
-      ip = "Error";
-    }
-  }
-
-  document.getElementById("ip").textContent = ip;
-
-  // ===== SEND TO GOOGLE SHEET =====
-  fetch("https://script.google.com/macros/s/AKfycbxWKNPpRBs1FBjW8WRMA3xiB-_XQKSYVAZ6MuYy_XYdXtsoE-2LFmrS6vW0ujf_6TF1mQ/exec", {
-    method: "POST",
-    body: JSON.stringify({
-      name: save.name,
-      ip: ip,
-      userAgent: navigator.userAgent
-    })
-  });
-}
 
 // ===== GAME STATE =====
 let state="menu";
