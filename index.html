@@ -5,7 +5,104 @@
 <meta charset="UTF-8">
 <title>Ultimate Ragdoll Archers</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js">
+
+// -------- Special Arrows --------
+let arrowType = 0
+const arrowNames = ["Normal","Explosive","Heavy","Triple"]
+
+const typeUI = document.createElement('div')
+typeUI.style.position='absolute'
+typeUI.style.right='10px'
+typeUI.style.top='10px'
+typeUI.style.color='white'
+typeUI.innerHTML='🏹 Arrow: <span id="arrowType">Normal</span>'
+document.body.appendChild(typeUI)
+
+window.addEventListener('keydown',()=>{
+arrowType++
+if(arrowType>=arrowNames.length) arrowType=0
+
+document.getElementById('arrowType').innerText=arrowNames[arrowType]
+})
+
+function shootSpecial(x,y,dx,dy,enemy=false){
+
+if(arrowType===0){
+shootArrow(x,y,dx,dy,enemy)
+}
+
+// explosive
+if(arrowType===1){
+let a = Bodies.circle(x,y,6,{render:{fillStyle:'orange'}})
+Body.setVelocity(a,{x:dx,y:dy})
+
+a.explosive=true
+World.add(world,a)
+arrows.push(a)
+}
+
+// heavy
+if(arrowType===2){
+let a = Bodies.rectangle(x,y,50,6,{density:0.01,render:{fillStyle:'cyan'}})
+Body.setVelocity(a,{x:dx*0.8,y:dy*0.8})
+World.add(world,a)
+arrows.push(a)
+}
+
+// triple
+if(arrowType===3){
+shootArrow(x,y,dx,dy)
+shootArrow(x,y,dx,dy-2)
+shootArrow(x,y,dx,dy+2)
+}
+
+}
+
+// replace shoot calls
+window.addEventListener('mouseup',()=>{
+charging=false
+let dx = (mouse.x-player.head.position.x)*0.05
+let dy = (mouse.y-player.head.position.y)*0.05
+shootSpecial(player.head.position.x,player.head.position.y,dx,dy)
+})
+
+window.addEventListener('touchend',()=>{
+charging=false
+let dx = (mouse.x-player.head.position.x)*0.05
+let dy = (mouse.y-player.head.position.y)*0.05
+shootSpecial(player.head.position.x,player.head.position.y,dx,dy)
+})
+
+// explosion physics
+Events.on(engine,'collisionStart',function(e){
+for(let pair of e.pairs){
+
+if(pair.bodyA.explosive||pair.bodyB.explosive){
+
+let pos = pair.bodyA.position
+
+for(let body of world.bodies){
+let dx = body.position.x-pos.x
+let dy = body.position.y-pos.y
+let dist = Math.sqrt(dx*dx+dy*dy)
+
+if(dist<120){
+Body.applyForce(body,body.position,{
+x:dx*0.0005,
+y:dy*0.0005
+})
+}
+
+}
+
+}
+
+}
+
+})
+
+</script>
 
 <style>
 body{margin:0;overflow:hidden;background:#111}
@@ -264,5 +361,3 @@ setInterval(checkWin,1000)
 
 </body>
 </html>
-```
-
